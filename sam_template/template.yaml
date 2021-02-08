@@ -3,6 +3,25 @@ Transform: AWS::Serverless-2016-10-31
 Description: Template for step-functions-workshop
 
 Resources:
+  ApplicationProcessingStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachine/account-application-workflow.asl.json
+      DefinitionSubstitutions:
+        DataCheckingFunctionArn: !GetAtt DataCheckingFunction.Arn
+        FlagApplicationFunctionName: !Ref FlagApplicationFunction
+        ApproveApplicationFunctionArn: !GetAtt ApproveApplicationFunction.Arn
+        RejectApplicationFunctionArn: !GetAtt RejectApplicationFunction.Arn        
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref DataCheckingFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FlagApplicationFunction            
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ApproveApplicationFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref RejectApplicationFunction            
+
   ApproveApplicationFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -67,6 +86,27 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref ApplicationsTable
 
+  ReviewApplicationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sfn-workshop-ReviewApplication
+      CodeUri: functions/account-applications/
+      Handler: review.handler
+      Runtime: nodejs12.x
+      Environment:
+        Variables:
+          APPLICATIONS_TABLE_NAME: !Ref ApplicationsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ApplicationsTable
+        - Statement:
+          - Sid: AllowCallbacksToStateMachinePolicy
+            Effect: "Allow"
+            Action:
+              - "states:SendTaskSuccess"
+              - "states:SendTaskFailure"
+            Resource: !Ref ApplicationProcessingStateMachine            
+
   SubmitApplicationFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -77,9 +117,12 @@ Resources:
       Environment:
         Variables:
           APPLICATIONS_TABLE_NAME: !Ref ApplicationsTable
+          APPLICATION_PROCESSING_STEP_FUNCTION_ARN: !Ref ApplicationProcessingStateMachine
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ApplicationsTable
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !GetAtt ApplicationProcessingStateMachine.Name            
 
   ApplicationsTable:
     Type: 'AWS::DynamoDB::Table'
