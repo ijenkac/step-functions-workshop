@@ -1,0 +1,10 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "step-functions-workshop"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1tmna9mqnd45t"
+s3_prefix = "step-functions-workshop"
+region = "eu-west-1"
+profile = "boi-dev"
+capabilities = "CAPABILITY_IAM"
